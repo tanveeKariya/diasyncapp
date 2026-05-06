@@ -21,8 +21,13 @@ export default function SettingsScreen() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportAllData();
-      Alert.alert('Export Complete', 'Your data has been exported successfully.');
+      const path = await exportAllData();
+      Alert.alert(
+        'Export Complete',
+        Platform.OS === 'web'
+          ? 'Your CSV file has been downloaded.'
+          : `Your data has been exported and the share dialog opened.\n\nFile: ${path}`
+      );
     } catch (e) {
       Alert.alert('Export Failed', 'Could not export data. Please try again.\n' + (e.message || ''));
     } finally {

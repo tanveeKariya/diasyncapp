@@ -1,5 +1,5 @@
-// PHASE 7 BONUS: Export all logged data as a CSV file and share it
-// Works on native (Android/iOS) via expo-sharing, and on web via download
+// Export all logged data as a CSV file and share it
+// Uses expo-file-system to write + expo-sharing to share on Android
 import { Platform, Share, Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -7,79 +7,63 @@ import { format } from 'date-fns';
 
 import { fetchGlucose, fetchInsulin, fetchFood } from '../database/db';
 
-// Convert an array of objects to a CSV string
-const toCSV = (headers, rows, mapper) => {
-  const lines = [headers.join(',')];
-  for (const row of rows) {
-    lines.push(
-      mapper(row)
-        .map(v => `"${String(v ?? '').replace(/"/g, '""')}"`)
-        .join(',')
-    );
-  }
-  return lines.join('\n');
-};
-
 export const exportAllData = async () => {
+  // 1. Fetch all data from SQLite
   const [glucose, insulin, food] = await Promise.all([
     fetchGlucose(),
     fetchInsulin(),
     fetchFood(),
   ]);
 
-  const glucoseCSV = toCSV(
-    ['ID', 'Value_mg_dL', 'Timestamp', 'Note'],
-    glucose,
-    r => [r.id, r.value, format(new Date(r.timestamp), 'yyyy-MM-dd HH:mm:ss'), r.note || '']
-  );
+  // 2. Build CSV in the requested unified format:
+  //    type,value,units,timestamp
+  const lines = ['type,value,units,timestamp'];
 
-  const insulinCSV = toCSV(
-    ['ID', 'Units', 'Type', 'Timestamp', 'Note'],
-    insulin,
-    r => [r.id, r.units, r.type, format(new Date(r.timestamp), 'yyyy-MM-dd HH:mm:ss'), r.note || '']
-  );
-
-  const foodCSV = toCSV(
-    ['ID', 'Food', 'Carbs_g', 'Timestamp', 'Note'],
-    food,
-    r => [r.id, r.name, r.carbs, format(new Date(r.timestamp), 'yyyy-MM-dd HH:mm:ss'), r.note || '']
-  );
-
-  const combined =
-    'GLUCOSE_READINGS\n' + glucoseCSV +
-    '\n\nINSULIN_DOSES\n' + insulinCSV +
-    '\n\nFOOD_ENTRIES\n'  + foodCSV;
-
-  const filename = `diabetes_export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-
-  // Web platform: use the Share API with the CSV text directly
-  if (Platform.OS === 'web') {
-    try {
-      // Create a downloadable blob
-      const blob = new Blob([combined], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      return 'web_download';
-    } catch (e) {
-      // Fallback to React Native Share
-      await Share.share({ message: combined, title: filename });
-      return 'web_share';
-    }
+  for (const g of glucose) {
+    lines.push(`glucose,${g.value},,${g.timestamp}`);
   }
 
-  // Native platform: write to file then share
+  for (const i of insulin) {
+    lines.push(`insulin,,${i.units},${i.timestamp}`);
+  }
+
+  for (const f of food) {
+    const carbsPart = f.carbs > 0 ? `${f.carbs}` : '';
+    lines.push(`food,${f.name},${carbsPart},${f.timestamp}`);
+  }
+
+  const csvContent = lines.join('\n');
+  const filename = `diabetes_export_${format(new Date(), 'yyyy-MM-dd_HHmm')}.csv`;
+
+  // 3. Write to a file using FileSystem
   const filePath = FileSystem.documentDirectory + filename;
 
-  await FileSystem.writeAsStringAsync(filePath, combined, {
+  await FileSystem.writeAsStringAsync(filePath, csvContent, {
     encoding: FileSystem.EncodingType.UTF8,
   });
 
+  // 4. Verify the file was written
+  const info = await FileSystem.getInfoAsync(filePath);
+  if (!info.exists) {
+    throw new Error('File was not created successfully.');
+  }
+
+  // 5. Share the file
+  if (Platform.OS === 'web') {
+    // Web fallback: trigger a browser download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return filePath;
+  }
+
+  // Android / iOS: use expo-sharing if available, otherwise React Native Share
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
     await Sharing.shareAsync(filePath, {
@@ -88,9 +72,14 @@ export const exportAllData = async () => {
       UTI: 'public.comma-separated-values-text',
     });
   } else {
-    // Fallback to React Native Share
-    await Share.share({ message: combined, title: filename });
+    await Share.share({
+      message: csvContent,
+      title: filename,
+    });
   }
 
   return filePath;
 };
+
+
+export { exportAllData }
