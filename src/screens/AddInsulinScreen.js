@@ -1,4 +1,4 @@
-// PHASE 2 + PHASE 5: Log an insulin dose with type selector and validation
+// Add Insulin — type selector, unit input, manual date/time, quick-select
 import React, { useState } from 'react';
 import {
   View,
@@ -14,32 +14,33 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 
 import { insertInsulin } from '../database/db';
-import { COLORS } from '../constants/themes';
+import { COLORS, SPACING, RADIUS } from '../constants/themes';
 
-const INSULIN_TYPES = [
-  { key: 'Rapid', label: 'Rapid-Acting', desc: 'Humalog, NovoLog, Fiasp' },
-  { key: 'Long',  label: 'Long-Acting',  desc: 'Lantus, Basaglar, Toujeo' },
+const TYPES = [
+  { key: 'Rapid', label: 'Rapid-Acting', desc: 'Humalog, NovoLog, Fiasp', icon: 'bolt' },
+  { key: 'Long',  label: 'Long-Acting',  desc: 'Lantus, Basaglar, Toujeo', icon: 'moon' },
 ];
 
-const QUICK_UNITS = [1, 2, 4, 6, 8, 10, 12, 15];
+const QUICK_UNITS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
 
 export default function AddInsulinScreen({ navigation }) {
-  const [units, setUnits]   = useState('');
-  const [type, setType]     = useState('Rapid');
-  const [note, setNote]     = useState('');
-  const [date, setDate]     = useState(new Date());
+  const [units, setUnits]       = useState('');
+  const [type, setType]         = useState('Rapid');
+  const [note, setNote]         = useState('');
+  const [date, setDate]         = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
-  const [error, setError]   = useState('');
+  const [pickerMode, setPickerMode] = useState('date');
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
+  const [error, setError]       = useState('');
 
   const numericUnits = parseFloat(units);
 
   const validate = () => {
-    if (!units.trim())          return 'Please enter the number of units.';
-    if (isNaN(numericUnits))    return 'Units must be a number.';
-    if (numericUnits <= 0)      return 'Units must be greater than 0.';
-    if (numericUnits > 100)     return 'Units seem very high (max 100). Double-check.';
+    if (!units.trim())        return 'Enter the number of units.';
+    if (isNaN(numericUnits))  return 'Must be a number.';
+    if (numericUnits <= 0)    return 'Must be greater than 0.';
+    if (numericUnits > 100)   return 'Too high (max 100). Double-check.';
     return null;
   };
 
@@ -54,15 +55,17 @@ export default function AddInsulinScreen({ navigation }) {
       setUnits('');
       setNote('');
       setDate(new Date());
-      setTimeout(() => {
-        setSaved(false);
-        navigation?.navigate?.('Dashboard');
-      }, 800);
-    } catch (e) {
-      Alert.alert('Error', 'Could not save dose. Please try again.');
+      setTimeout(() => { setSaved(false); navigation?.navigate?.('Dashboard'); }, 700);
+    } catch {
+      Alert.alert('Error', 'Could not save. Try again.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const openPicker = (mode) => {
+    setPickerMode(mode);
+    setShowPicker(true);
   };
 
   return (
@@ -72,27 +75,27 @@ export default function AddInsulinScreen({ navigation }) {
         <Text style={styles.heading}>Log Insulin</Text>
         <Text style={styles.subheading}>Track your insulin dose</Text>
 
-        {/* ─── Insulin Type ─── */}
+        {/* ─── Type Selector ─── */}
         <Text style={styles.label}>Insulin Type</Text>
         <View style={styles.typeRow}>
-          {INSULIN_TYPES.map(t => {
+          {TYPES.map(t => {
             const active = type === t.key;
             return (
               <TouchableOpacity
                 key={t.key}
-                style={[styles.typeCard, active && styles.typeCardActive]}
+                style={[styles.typeCard, active && { borderColor: COLORS.accent, backgroundColor: COLORS.accentLight }]}
                 onPress={() => setType(t.key)}
               >
-                <Text style={[styles.typeTitle, active && styles.typeTitleActive]}>{t.label}</Text>
-                <Text style={[styles.typeDesc,  active && styles.typeDescActive]}>{t.desc}</Text>
+                <Text style={[styles.typeTitle, active && { color: COLORS.accent }]}>{t.label}</Text>
+                <Text style={[styles.typeDesc, active && { color: COLORS.accent }]}>{t.desc}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* ─── Units Input ─── */}
+        {/* ─── Units ─── */}
         <Text style={styles.label}>Units</Text>
-        <View style={styles.inputRow}>
+        <View style={styles.inputWrap}>
           <TextInput
             value={units}
             onChangeText={v => { setUnits(v); setError(''); }}
@@ -105,30 +108,36 @@ export default function AddInsulinScreen({ navigation }) {
           <Text style={styles.unitSuffix}>units</Text>
         </View>
 
-        {/* ─── Quick-Select Units ─── */}
-        <Text style={styles.quickLabel}>Quick Select</Text>
+        {/* ─── Quick Select ─── */}
+        <Text style={styles.hint}>Quick Select</Text>
         <View style={styles.quickRow}>
           {QUICK_UNITS.map(u => (
             <TouchableOpacity
               key={u}
-              style={[styles.quickBtn, units === String(u) && styles.quickBtnActive]}
+              style={[styles.quickPill, units === String(u) && styles.quickPillActive]}
               onPress={() => { setUnits(String(u)); setError(''); }}
             >
-              <Text style={[styles.quickBtnText, units === String(u) && styles.quickBtnTextActive]}>{u}</Text>
+              <Text style={[styles.quickPillText, units === String(u) && styles.quickPillTextActive]}>{u}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* ─── Timestamp ─── */}
+        {/* ─── Date & Time ─── */}
         <Text style={styles.label}>Date & Time</Text>
-        <TouchableOpacity style={styles.timeRow} onPress={() => setShowPicker(true)}>
-          <Text style={styles.timeText}>{format(date, 'EEEE, d MMM yyyy  HH:mm')}</Text>
-          <Text style={styles.editLink}>Change</Text>
-        </TouchableOpacity>
+        <View style={styles.dtRow}>
+          <TouchableOpacity style={styles.dtBtn} onPress={() => openPicker('date')}>
+            <Text style={styles.dtBtnLabel}>Date</Text>
+            <Text style={styles.dtBtnValue}>{format(date, 'd MMM yyyy')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.dtBtn} onPress={() => openPicker('time')}>
+            <Text style={styles.dtBtnLabel}>Time</Text>
+            <Text style={styles.dtBtnValue}>{format(date, 'HH:mm')}</Text>
+          </TouchableOpacity>
+        </View>
         {showPicker && (
           <DateTimePicker
             value={date}
-            mode="datetime"
+            mode={pickerMode}
             display="default"
             onChange={(e, sel) => { setShowPicker(false); if (sel) setDate(sel); }}
           />
@@ -150,7 +159,7 @@ export default function AddInsulinScreen({ navigation }) {
         }
 
         <TouchableOpacity
-          style={[styles.saveBtn, saved && styles.saveBtnSuccess]}
+          style={[styles.saveBtn, saved && styles.saveBtnDone]}
           onPress={handleSave}
           disabled={saving}
         >
@@ -160,6 +169,7 @@ export default function AddInsulinScreen({ navigation }) {
           }
         </TouchableOpacity>
 
+        <View style={{ height: 30 }} />
       </View>
     </ScrollView>
   );
@@ -167,96 +177,95 @@ export default function AddInsulinScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  inner: { padding: 20, paddingBottom: 40 },
+  inner: { padding: SPACING.xl },
 
-  heading:    { fontSize: 24, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-  subheading: { fontSize: 14, color: COLORS.subtext, marginBottom: 24 },
+  heading:    { fontSize: 24, fontWeight: '800', color: COLORS.text, marginBottom: 2 },
+  subheading: { fontSize: 14, color: COLORS.subtext, marginBottom: SPACING.xxl },
 
-  label: { fontSize: 13, fontWeight: '600', color: COLORS.textMed, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  label: { fontSize: 12, fontWeight: '700', color: COLORS.textMed, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8 },
+  hint:  { fontSize: 11, color: COLORS.subtext, marginBottom: 6 },
 
-  typeRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  typeRow: { flexDirection: 'row', gap: 8, marginBottom: SPACING.xl },
   typeCard: {
     flex: 1,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     borderWidth: 2,
     borderColor: COLORS.border,
   },
-  typeCardActive: { borderColor: COLORS.accent, backgroundColor: COLORS.accentLight },
-  typeTitle:       { fontSize: 13, fontWeight: '700', color: COLORS.textMed },
-  typeTitleActive: { color: COLORS.accent },
-  typeDesc:        { fontSize: 11, color: COLORS.placeholder, marginTop: 3 },
-  typeDescActive:  { color: COLORS.accent },
+  typeTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textMed, marginBottom: 2 },
+  typeDesc:  { fontSize: 11, color: COLORS.placeholder },
 
-  inputRow: {
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
     borderWidth: 2,
     borderColor: COLORS.border,
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+    shadowColor: COLORS.shadow,
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  bigInput: {
+  bigInput: { flex: 1, fontSize: 36, fontWeight: '800', color: COLORS.text, paddingVertical: 14 },
+  unitSuffix: { fontSize: 16, color: COLORS.subtext, fontWeight: '600' },
+
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.xl },
+  quickPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  quickPillActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
+  quickPillText:       { color: COLORS.textMed, fontWeight: '600', fontSize: 13 },
+  quickPillTextActive: { color: COLORS.white },
+
+  dtRow: { flexDirection: 'row', gap: 8, marginBottom: SPACING.lg },
+  dtBtn: {
     flex: 1,
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.text,
-    paddingVertical: 14,
-  },
-  unitSuffix: { fontSize: 16, color: COLORS.subtext, fontWeight: '500' },
-
-  quickLabel: { fontSize: 12, color: COLORS.subtext, marginBottom: 8 },
-  quickRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  quickBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.card,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  quickBtnActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
-  quickBtnText:   { color: COLORS.textMed, fontWeight: '500' },
-  quickBtnTextActive: { color: COLORS.white },
-
-  timeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 20,
-  },
-  timeText: { color: COLORS.text, fontSize: 14 },
-  editLink: { color: COLORS.primary, fontSize: 13, fontWeight: '600' },
+  dtBtnLabel: { fontSize: 10, color: COLORS.subtext, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  dtBtnValue: { fontSize: 15, fontWeight: '700', color: COLORS.text },
 
   noteInput: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     fontSize: 14,
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
-    minHeight: 80,
+    minHeight: 72,
     textAlignVertical: 'top',
-    marginBottom: 20,
+    marginBottom: SPACING.lg,
   },
 
-  error: { color: COLORS.high, fontSize: 13, marginBottom: 12 },
+  error: { color: COLORS.high, fontSize: 13, fontWeight: '600', marginBottom: SPACING.md },
 
   saveBtn: {
     backgroundColor: COLORS.accent,
-    borderRadius: 14,
+    borderRadius: RADIUS.lg,
     padding: 16,
     alignItems: 'center',
+    shadowColor: COLORS.accent,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  saveBtnSuccess: { backgroundColor: COLORS.safe },
+  saveBtnDone: { backgroundColor: COLORS.safe },
   saveBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
 });

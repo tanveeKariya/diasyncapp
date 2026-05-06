@@ -1,9 +1,9 @@
-// Root app entry — wires up navigation and initialises the SQLite database
+// Root app entry — navigation, database init, notification setup
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen       from './src/screens/HomeScreen';
@@ -13,13 +13,12 @@ import AddFoodScreen    from './src/screens/AddFoodScreen';
 import HistoryScreen    from './src/screens/HistoryScreen';
 import SettingsScreen   from './src/screens/SettingsScreen';
 
-import { initDB }    from './src/database/db';
-import { COLORS }    from './src/constants/themes';
+import { initDB } from './src/database/db';
+import { COLORS } from './src/constants/themes';
 import { scheduleReminders } from './src/utils/notifications';
 
 const Tab = createBottomTabNavigator();
 
-// Tab icon map — uses Ionicons (bundled in @expo/vector-icons)
 const ICONS = {
   Dashboard: { active: 'grid',        inactive: 'grid-outline'        },
   Glucose:   { active: 'water',       inactive: 'water-outline'       },
@@ -33,15 +32,11 @@ export default function App() {
   useEffect(() => {
     (async () => {
       await initDB();
-      // Notifications only work in development builds, not Expo Go
-      // They will silently no-op if unavailable
       try {
         if (Platform.OS !== 'web') {
           await scheduleReminders();
         }
-      } catch {
-        // Silently skip notifications in Expo Go
-      }
+      } catch {}
     })();
   }, []);
 
@@ -55,24 +50,24 @@ export default function App() {
             shadowOpacity: 0,
           },
           headerTintColor: COLORS.white,
-          headerTitleStyle: { fontWeight: '700', fontSize: 18 },
+          headerTitleStyle: { fontWeight: '800', fontSize: 18, letterSpacing: -0.3 },
           tabBarActiveTintColor:   COLORS.primary,
           tabBarInactiveTintColor: COLORS.placeholder,
           tabBarStyle: {
-            backgroundColor: COLORS.card,
+            backgroundColor: COLORS.white,
             borderTopColor: COLORS.divider,
             borderTopWidth: 1,
-            paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-            paddingTop: 8,
-            height: Platform.OS === 'ios' ? 82 : 62,
+            paddingBottom: Platform.OS === 'ios' ? 20 : 6,
+            paddingTop: 6,
+            height: Platform.OS === 'ios' ? 80 : 58,
           },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+          tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginTop: 2, letterSpacing: 0.3 },
           tabBarIcon: ({ focused, color, size }) => {
             const icons = ICONS[route.name] || { active: 'ellipse', inactive: 'ellipse-outline' };
             return (
               <Ionicons
                 name={focused ? icons.active : icons.inactive}
-                size={size}
+                size={focused ? size + 2 : size}
                 color={color}
               />
             );

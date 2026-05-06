@@ -1,11 +1,12 @@
-// PHASE 7 BONUS: Reminder notifications — gracefully handles Expo Go limitations
+// Hourly reminder notifications — gracefully handles Expo Go limitations
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 
 let notificationsAvailable = false;
+let Notifications = null;
 
-// Configure how notifications appear when received
+// Try to import expo-notifications — it may not be available in Expo Go
 try {
+  Notifications = require('expo-notifications');
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -15,11 +16,11 @@ try {
   });
   notificationsAvailable = true;
 } catch {
-  // expo-notifications not fully available in this environment (e.g. Expo Go)
   notificationsAvailable = false;
 }
 
-// Request notification permissions from the OS
+export const isNotificationsAvailable = () => notificationsAvailable;
+
 export const requestPermissions = async () => {
   if (!notificationsAvailable) return false;
   try {
@@ -30,14 +31,11 @@ export const requestPermissions = async () => {
   }
 };
 
-// Cancel all previously scheduled notifications
 export const cancelAllReminders = async () => {
   if (!notificationsAvailable) return;
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
-  } catch {
-    // Silently fail in Expo Go
-  }
+  } catch {}
 };
 
 // Schedule a repeating hourly notification
@@ -47,41 +45,15 @@ export const scheduleHourlyReminders = async (title, body) => {
     await Notifications.scheduleNotificationAsync({
       content: { title, body, sound: true },
       trigger: {
-        seconds: 3600, // 1 hour
+        seconds: 3600,
         repeats: true,
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       },
     });
-  } catch {
-    // Silently fail in Expo Go
-  }
+  } catch {}
 };
 
-// Schedule recurring daily reminders at specific hours
-export const scheduleDailyReminders = async (hours, title, body) => {
-  if (!notificationsAvailable) return;
-  try {
-    for (const hour of hours) {
-      await Notifications.scheduleNotificationAsync({
-        content: { title, body, sound: true },
-        trigger: {
-          hour,
-          minute: 0,
-          repeats: true,
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        },
-      });
-    }
-  } catch {
-    // Silently fail in Expo Go
-  }
-};
-
-// Check if notifications are available in the current environment
-export const isNotificationsAvailable = () => notificationsAvailable;
-
-// Main setup — called once on app launch
-// Sets up hourly glucose check reminders
+// Main setup — hourly reminders to log glucose, insulin, food
 export const scheduleReminders = async () => {
   if (Platform.OS === 'web') return;
 
@@ -90,9 +62,8 @@ export const scheduleReminders = async () => {
 
   await cancelAllReminders();
 
-  // Hourly glucose check reminder
   await scheduleHourlyReminders(
-    'Check your blood glucose',
-    'Time for your hourly glucose check. Stay on top of your levels!'
+    'Time to log your readings',
+    'Record your glucose, insulin, and food to stay on track.'
   );
 };

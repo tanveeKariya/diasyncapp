@@ -1,4 +1,4 @@
-// PHASE 2 + PHASE 5: Log a food entry with carb tracking
+// Add Food — meal name, optional carbs, quick-add common foods, manual date/time
 import React, { useState } from 'react';
 import {
   View,
@@ -14,9 +14,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 
 import { insertFood } from '../database/db';
-import { COLORS } from '../constants/themes';
+import { COLORS, SPACING, RADIUS } from '../constants/themes';
 
-// Common foods with typical carb values for quick-add
 const QUICK_FOODS = [
   { name: 'White rice (1 cup)',  carbs: 45 },
   { name: 'White bread (1 sl)', carbs: 15 },
@@ -24,6 +23,8 @@ const QUICK_FOODS = [
   { name: 'Banana (medium)',    carbs: 27 },
   { name: 'Orange juice (8oz)', carbs: 26 },
   { name: 'Pasta (1 cup)',      carbs: 40 },
+  { name: 'Milk (1 cup)',       carbs: 12 },
+  { name: 'Egg',                carbs: 0  },
 ];
 
 export default function AddFoodScreen({ navigation }) {
@@ -32,15 +33,16 @@ export default function AddFoodScreen({ navigation }) {
   const [note, setNote]         = useState('');
   const [date, setDate]         = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState('date');
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
   const [error, setError]       = useState('');
 
   const validate = () => {
-    if (!name.trim())             return 'Please enter a food name.';
+    if (!name.trim())             return 'Enter a food name.';
     const c = parseFloat(carbs);
-    if (carbs !== '' && (isNaN(c) || c < 0)) return 'Carbs must be a positive number.';
-    if (!isNaN(c) && c > 500)    return 'Carbs value seems too high (max 500g).';
+    if (carbs !== '' && (isNaN(c) || c < 0)) return 'Carbs must be positive.';
+    if (!isNaN(c) && c > 500)    return 'Carbs too high (max 500g).';
     return null;
   };
 
@@ -57,21 +59,23 @@ export default function AddFoodScreen({ navigation }) {
       setCarbs('');
       setNote('');
       setDate(new Date());
-      setTimeout(() => {
-        setSaved(false);
-        navigation?.navigate?.('Dashboard');
-      }, 800);
-    } catch (e) {
-      Alert.alert('Error', 'Could not save food entry. Please try again.');
+      setTimeout(() => { setSaved(false); navigation?.navigate?.('Dashboard'); }, 700);
+    } catch {
+      Alert.alert('Error', 'Could not save. Try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const applyQuickFood = (item) => {
+  const applyQuick = (item) => {
     setName(item.name);
     setCarbs(String(item.carbs));
     setError('');
+  };
+
+  const openPicker = (mode) => {
+    setPickerMode(mode);
+    setShowPicker(true);
   };
 
   return (
@@ -88,13 +92,13 @@ export default function AddFoodScreen({ navigation }) {
           onChangeText={v => { setName(v); setError(''); }}
           placeholder="e.g. Oatmeal with berries"
           placeholderTextColor={COLORS.placeholder}
-          style={styles.input}
+          style={styles.textInput}
           maxLength={100}
         />
 
         {/* ─── Carbs ─── */}
         <Text style={styles.label}>Carbohydrates (g) — optional</Text>
-        <View style={styles.inputRow}>
+        <View style={styles.carbWrap}>
           <TextInput
             value={carbs}
             onChangeText={v => { setCarbs(v); setError(''); }}
@@ -104,38 +108,43 @@ export default function AddFoodScreen({ navigation }) {
             style={styles.carbInput}
             maxLength={5}
           />
-          <Text style={styles.carbSuffix}>g carbs</Text>
+          <Text style={styles.carbSuffix}>g</Text>
         </View>
 
         {/* ─── Quick Foods ─── */}
-        <Text style={styles.quickLabel}>Common Foods</Text>
+        <Text style={styles.hint}>Common Foods</Text>
         <View style={styles.quickGrid}>
-          {QUICK_FOODS.map(item => (
-            <TouchableOpacity
-              key={item.name}
-              style={[styles.quickCard, name === item.name && styles.quickCardActive]}
-              onPress={() => applyQuickFood(item)}
-            >
-              <Text style={[styles.quickCardName, name === item.name && styles.quickCardNameActive]} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={[styles.quickCardCarbs, name === item.name && styles.quickCardCarbsActive]}>
-                {item.carbs}g
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {QUICK_FOODS.map(item => {
+            const active = name === item.name;
+            return (
+              <TouchableOpacity
+                key={item.name}
+                style={[styles.quickCard, active && { borderColor: COLORS.food, backgroundColor: COLORS.foodLight }]}
+                onPress={() => applyQuick(item)}
+              >
+                <Text style={[styles.quickCardName, active && { color: COLORS.food, fontWeight: '700' }]} numberOfLines={1}>{item.name}</Text>
+                <Text style={[styles.quickCardCarbs, active && { color: COLORS.food }]}>{item.carbs}g</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* ─── Timestamp ─── */}
+        {/* ─── Date & Time ─── */}
         <Text style={styles.label}>Date & Time</Text>
-        <TouchableOpacity style={styles.timeRow} onPress={() => setShowPicker(true)}>
-          <Text style={styles.timeText}>{format(date, 'EEEE, d MMM yyyy  HH:mm')}</Text>
-          <Text style={styles.editLink}>Change</Text>
-        </TouchableOpacity>
+        <View style={styles.dtRow}>
+          <TouchableOpacity style={styles.dtBtn} onPress={() => openPicker('date')}>
+            <Text style={styles.dtBtnLabel}>Date</Text>
+            <Text style={styles.dtBtnValue}>{format(date, 'd MMM yyyy')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.dtBtn} onPress={() => openPicker('time')}>
+            <Text style={styles.dtBtnLabel}>Time</Text>
+            <Text style={styles.dtBtnValue}>{format(date, 'HH:mm')}</Text>
+          </TouchableOpacity>
+        </View>
         {showPicker && (
           <DateTimePicker
             value={date}
-            mode="datetime"
+            mode={pickerMode}
             display="default"
             onChange={(e, sel) => { setShowPicker(false); if (sel) setDate(sel); }}
           />
@@ -146,7 +155,7 @@ export default function AddFoodScreen({ navigation }) {
         <TextInput
           value={note}
           onChangeText={setNote}
-          placeholder="e.g. estimated portion, restaurant meal..."
+          placeholder="e.g. estimated portion, restaurant..."
           placeholderTextColor={COLORS.placeholder}
           style={styles.noteInput}
           multiline
@@ -157,7 +166,7 @@ export default function AddFoodScreen({ navigation }) {
         }
 
         <TouchableOpacity
-          style={[styles.saveBtn, saved && styles.saveBtnSuccess]}
+          style={[styles.saveBtn, saved && styles.saveBtnDone]}
           onPress={handleSave}
           disabled={saving}
         >
@@ -167,6 +176,7 @@ export default function AddFoodScreen({ navigation }) {
           }
         </TouchableOpacity>
 
+        <View style={{ height: 30 }} />
       </View>
     </ScrollView>
   );
@@ -174,49 +184,43 @@ export default function AddFoodScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  inner: { padding: 20, paddingBottom: 40 },
+  inner: { padding: SPACING.xl },
 
-  heading:    { fontSize: 24, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-  subheading: { fontSize: 14, color: COLORS.subtext, marginBottom: 24 },
+  heading:    { fontSize: 24, fontWeight: '800', color: COLORS.text, marginBottom: 2 },
+  subheading: { fontSize: 14, color: COLORS.subtext, marginBottom: SPACING.xxl },
 
-  label: { fontSize: 13, fontWeight: '600', color: COLORS.textMed, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  label: { fontSize: 12, fontWeight: '700', color: COLORS.textMed, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8 },
+  hint:  { fontSize: 11, color: COLORS.subtext, marginBottom: 6 },
 
-  input: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
+  textInput: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     fontSize: 15,
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: 20,
+    marginBottom: SPACING.lg,
   },
 
-  inputRow: {
+  carbWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 14,
-    borderWidth: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
     borderColor: COLORS.border,
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
   },
-  carbInput: {
-    flex: 1,
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.text,
-    paddingVertical: 14,
-  },
-  carbSuffix: { fontSize: 15, color: COLORS.subtext, fontWeight: '500' },
+  carbInput: { flex: 1, fontSize: 32, fontWeight: '800', color: COLORS.text, paddingVertical: 14 },
+  carbSuffix: { fontSize: 16, color: COLORS.subtext, fontWeight: '600' },
 
-  quickLabel: { fontSize: 12, color: COLORS.subtext, marginBottom: 8 },
-  quickGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.xl },
   quickCard: {
     width: '47%',
-    backgroundColor: COLORS.card,
-    borderRadius: 10,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.sm,
     padding: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -224,47 +228,47 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  quickCardActive: { backgroundColor: COLORS.foodLight, borderColor: COLORS.food },
-  quickCardName:       { flex: 1, fontSize: 12, color: COLORS.textMed, marginRight: 4 },
-  quickCardNameActive: { color: COLORS.food, fontWeight: '600' },
-  quickCardCarbs:       { fontSize: 12, fontWeight: '700', color: COLORS.subtext },
-  quickCardCarbsActive: { color: COLORS.food },
+  quickCardName:  { flex: 1, fontSize: 12, color: COLORS.textMed, marginRight: 4 },
+  quickCardCarbs: { fontSize: 12, fontWeight: '700', color: COLORS.subtext },
 
-  timeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
+  dtRow: { flexDirection: 'row', gap: 8, marginBottom: SPACING.lg },
+  dtBtn: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: 20,
   },
-  timeText: { color: COLORS.text, fontSize: 14 },
-  editLink: { color: COLORS.primary, fontSize: 13, fontWeight: '600' },
+  dtBtnLabel: { fontSize: 10, color: COLORS.subtext, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  dtBtnValue: { fontSize: 15, fontWeight: '700', color: COLORS.text },
 
   noteInput: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     fontSize: 14,
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
-    minHeight: 80,
+    minHeight: 72,
     textAlignVertical: 'top',
-    marginBottom: 20,
+    marginBottom: SPACING.lg,
   },
 
-  error: { color: COLORS.high, fontSize: 13, marginBottom: 12 },
+  error: { color: COLORS.high, fontSize: 13, fontWeight: '600', marginBottom: SPACING.md },
 
   saveBtn: {
     backgroundColor: COLORS.food,
-    borderRadius: 14,
+    borderRadius: RADIUS.lg,
     padding: 16,
     alignItems: 'center',
+    shadowColor: COLORS.food,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  saveBtnSuccess: { backgroundColor: COLORS.safe },
+  saveBtnDone: { backgroundColor: COLORS.safe },
   saveBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
 });

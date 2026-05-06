@@ -1,47 +1,78 @@
-// Primary palette: deep teal-blue, clean and medical-grade feel
+// Design system — medical-grade color palette, spacing, and helpers
 export const COLORS = {
-  primary: '#0EA5E9',      // sky-500 — action blue
-  primaryDark: '#0284C7',  // sky-600
-  primaryLight: '#E0F2FE', // sky-100
+  // Primary: sky blue — trustworthy, clinical
+  primary:       '#0EA5E9',
+  primaryDark:   '#0284C7',
+  primaryLight:  '#E0F2FE',
+  primaryBg:     '#F0F9FF',
 
-  secondary: '#14B8A6',    // teal-500
-  secondaryLight: '#CCFBF1',
+  // Secondary: teal — complementary accent
+  secondary:      '#14B8A6',
+  secondaryDark: '#0D9488',
+  secondaryLight:'#CCFBF1',
 
-  accent: '#F97316',       // orange-500 — insulin highlight
-  accentLight: '#FEF3C7',
+  // Accent: orange — insulin / action highlights
+  accent:       '#F97316',
+  accentDark:  '#EA580C',
+  accentLight: '#FFF7ED',
 
-  background: '#F0F4F8',
-  card: '#FFFFFF',
-  cardBorder: '#E2E8F0',
+  // Food: emerald — food entries
+  food:       '#059669',
+  foodDark:   '#047857',
+  foodLight:  '#D1FAE5',
 
-  text: '#0F172A',         // slate-900
-  textMed: '#334155',      // slate-700
-  subtext: '#64748B',      // slate-500
-  placeholder: '#94A3B8',  // slate-400
-  border: '#CBD5E1',       // slate-300
-  divider: '#E2E8F0',
+  // Surfaces
+  background: '#F8FAFC',
+  surface:    '#FFFFFF',
+  surfaceAlt: '#F1F5F9',
+  border:     '#E2E8F0',
+  divider:    '#F1F5F9',
 
-  safe: '#10B981',         // emerald-500 — in-range glucose
+  // Text hierarchy
+  text:        '#0F172A',
+  textMed:     '#334155',
+  subtext:     '#64748B',
+  placeholder: '#94A3B8',
+  muted:       '#CBD5E1',
+
+  // Status: glucose ranges
+  safe:      '#10B981',
   safeLight: '#D1FAE5',
-  high: '#EF4444',         // red-500 — high glucose
+  high:      '#EF4444',
   highLight: '#FEE2E2',
-  low: '#F59E0B',          // amber-500 — low glucose
-  lowLight: '#FEF3C7',
-
-  food: '#8B5CF6',         // violet-500 — food entries
-  foodLight: '#EDE9FE',
+  low:       '#F59E0B',
+  lowLight:  '#FEF3C7',
 
   white: '#FFFFFF',
-  shadow: '#0F172A',
+  black: '#000000',
+  shadow:'rgba(15,23,42,0.08)',
 };
 
-export const GLUCOSE_RANGES = {
-  low: 70,
-  high: 180,
+// 8px spacing scale
+export const SPACING = {
+  xs:  4,
+  sm:  8,
+  md:  12,
+  lg:  16,
+  xl:  20,
+  xxl: 24,
+  xxxl:32,
 };
+
+// Border radius scale
+export const RADIUS = {
+  sm:   8,
+  md:   12,
+  lg:   16,
+  xl:   20,
+  full: 999,
+};
+
+// Glucose thresholds
+export const GLUCOSE_RANGES = { low: 70, high: 180 };
 
 export const getGlucoseStatus = (value) => {
-  if (value > GLUCOSE_RANGES.high) return { label: 'High', color: COLORS.high, bg: COLORS.highLight };
-  if (value < GLUCOSE_RANGES.low)  return { label: 'Low',  color: COLORS.low,  bg: COLORS.lowLight  };
-  return                                   { label: 'In Range', color: COLORS.safe, bg: COLORS.safeLight };
+  if (value > GLUCOSE_RANGES.high) return { label: 'High',     color: COLORS.high, bg: COLORS.highLight, icon: 'arrow-up' };
+  if (value < GLUCOSE_RANGES.low)  return { label: 'Low',      color: COLORS.low,  bg: COLORS.lowLight,  icon: 'arrow-down' };
+  return                                   { label: 'In Range', color: COLORS.safe,  bg: COLORS.safeLight,  icon: 'checkmark' };
 };

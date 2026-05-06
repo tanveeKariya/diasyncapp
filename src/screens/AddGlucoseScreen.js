@@ -1,4 +1,4 @@
-// PHASE 2 + PHASE 5: Log a glucose reading with validation and datetime picker
+// Add Glucose — polished input with live status, quick-select, manual date/time
 import React, { useState } from 'react';
 import {
   View,
@@ -14,30 +14,28 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 
 import { insertGlucose } from '../database/db';
-import { COLORS, getGlucoseStatus } from '../constants/themes';
+import { COLORS, SPACING, RADIUS, getGlucoseStatus } from '../constants/themes';
 
-// Quick-select preset values common in T1D management
-const QUICK_VALUES = [70, 90, 110, 140, 180, 250];
+const QUICK_VALUES = [54, 70, 90, 110, 140, 180, 250, 350];
 
 export default function AddGlucoseScreen({ navigation }) {
-  const [value, setValue]   = useState('');
-  const [note, setNote]     = useState('');
-  const [date, setDate]     = useState(new Date());
+  const [value, setValue]       = useState('');
+  const [note, setNote]         = useState('');
+  const [date, setDate]         = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
-  const [error, setError]   = useState('');
+  const [pickerMode, setPickerMode] = useState('date');
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
+  const [error, setError]       = useState('');
 
   const numericValue = parseFloat(value);
-  const previewStatus = !isNaN(numericValue) && numericValue > 0
-    ? getGlucoseStatus(numericValue)
-    : null;
+  const preview = !isNaN(numericValue) && numericValue > 0 ? getGlucoseStatus(numericValue) : null;
 
   const validate = () => {
-    if (!value.trim())              return 'Please enter a glucose value.';
-    if (isNaN(numericValue))        return 'Value must be a number.';
-    if (numericValue < 20)          return 'Value seems too low (min 20 mg/dL).';
-    if (numericValue > 600)         return 'Value seems too high (max 600 mg/dL).';
+    if (!value.trim())        return 'Enter a glucose value.';
+    if (isNaN(numericValue))  return 'Must be a number.';
+    if (numericValue < 20)    return 'Too low (min 20 mg/dL).';
+    if (numericValue > 600)   return 'Too high (max 600 mg/dL).';
     return null;
   };
 
@@ -52,16 +50,17 @@ export default function AddGlucoseScreen({ navigation }) {
       setValue('');
       setNote('');
       setDate(new Date());
-      // Navigate to Dashboard after a brief delay so the user sees "Saved!"
-      setTimeout(() => {
-        setSaved(false);
-        navigation?.navigate?.('Dashboard');
-      }, 800);
-    } catch (e) {
-      Alert.alert('Error', 'Could not save reading. Please try again.');
+      setTimeout(() => { setSaved(false); navigation?.navigate?.('Dashboard'); }, 700);
+    } catch {
+      Alert.alert('Error', 'Could not save. Try again.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const openPicker = (mode) => {
+    setPickerMode(mode);
+    setShowPicker(true);
   };
 
   return (
@@ -71,58 +70,59 @@ export default function AddGlucoseScreen({ navigation }) {
         <Text style={styles.heading}>Log Glucose</Text>
         <Text style={styles.subheading}>Record your blood glucose reading</Text>
 
-        {/* ─── Value Input ─── */}
+        {/* ─── Value ─── */}
         <Text style={styles.label}>Blood Glucose (mg/dL)</Text>
-        <View style={[styles.inputRow, previewStatus && { borderColor: previewStatus.color }]}>
+        <View style={[styles.inputWrap, preview && { borderColor: preview.color }]}>
           <TextInput
             value={value}
             onChangeText={v => { setValue(v); setError(''); }}
             keyboardType="decimal-pad"
-            placeholder="e.g. 110"
+            placeholder="0"
             placeholderTextColor={COLORS.placeholder}
             style={styles.bigInput}
             maxLength={5}
           />
-          {previewStatus && (
-            <View style={[styles.liveTag, { backgroundColor: previewStatus.bg }]}>
-              <Text style={[styles.liveTagText, { color: previewStatus.color }]}>
-                {previewStatus.label}
-              </Text>
+          {preview && (
+            <View style={[styles.livePill, { backgroundColor: preview.bg }]}>
+              <Text style={[styles.livePillText, { color: preview.color }]}>{preview.label}</Text>
             </View>
           )}
         </View>
 
-        {/* ─── Quick-Select Buttons ─── */}
-        <Text style={styles.quickLabel}>Quick Select</Text>
+        {/* ─── Quick Select ─── */}
+        <Text style={styles.hint}>Quick Select</Text>
         <View style={styles.quickRow}>
           {QUICK_VALUES.map(v => (
             <TouchableOpacity
               key={v}
-              style={[styles.quickBtn, value === String(v) && styles.quickBtnActive]}
+              style={[styles.quickPill, value === String(v) && styles.quickPillActive]}
               onPress={() => { setValue(String(v)); setError(''); }}
             >
-              <Text style={[styles.quickBtnText, value === String(v) && styles.quickBtnTextActive]}>
-                {v}
-              </Text>
+              <Text style={[styles.quickPillText, value === String(v) && styles.quickPillTextActive]}>{v}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* ─── Timestamp ─── */}
+        {/* ─── Date & Time ─── */}
         <Text style={styles.label}>Date & Time</Text>
-        <TouchableOpacity style={styles.timeRow} onPress={() => setShowPicker(true)}>
-          <Text style={styles.timeText}>{format(date, 'EEEE, d MMM yyyy  HH:mm')}</Text>
-          <Text style={styles.editLink}>Change</Text>
-        </TouchableOpacity>
-
+        <View style={styles.dtRow}>
+          <TouchableOpacity style={styles.dtBtn} onPress={() => openPicker('date')}>
+            <Text style={styles.dtBtnLabel}>Date</Text>
+            <Text style={styles.dtBtnValue}>{format(date, 'd MMM yyyy')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.dtBtn} onPress={() => openPicker('time')}>
+            <Text style={styles.dtBtnLabel}>Time</Text>
+            <Text style={styles.dtBtnValue}>{format(date, 'HH:mm')}</Text>
+          </TouchableOpacity>
+        </View>
         {showPicker && (
           <DateTimePicker
             value={date}
-            mode="datetime"
+            mode={pickerMode}
             display="default"
-            onChange={(e, selected) => {
+            onChange={(e, sel) => {
               setShowPicker(false);
-              if (selected) setDate(selected);
+              if (sel) setDate(sel);
             }}
           />
         )}
@@ -139,13 +139,11 @@ export default function AddGlucoseScreen({ navigation }) {
           maxLength={200}
         />
 
-        {/* ─── Error ─── */}
         {!!error && <Text style={styles.error}>{error}</Text>}
         }
 
-        {/* ─── Save Button ─── */}
         <TouchableOpacity
-          style={[styles.saveBtn, saved && styles.saveBtnSuccess]}
+          style={[styles.saveBtn, saved && styles.saveBtnDone]}
           onPress={handleSave}
           disabled={saving}
         >
@@ -155,6 +153,7 @@ export default function AddGlucoseScreen({ navigation }) {
           }
         </TouchableOpacity>
 
+        <View style={{ height: 30 }} />
       </View>
     </ScrollView>
   );
@@ -162,86 +161,84 @@ export default function AddGlucoseScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  inner: { padding: 20, paddingBottom: 40 },
+  inner: { padding: SPACING.xl },
 
-  heading:    { fontSize: 24, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-  subheading: { fontSize: 14, color: COLORS.subtext, marginBottom: 24 },
+  heading:    { fontSize: 24, fontWeight: '800', color: COLORS.text, marginBottom: 2 },
+  subheading: { fontSize: 14, color: COLORS.subtext, marginBottom: SPACING.xxl },
 
-  label: { fontSize: 13, fontWeight: '600', color: COLORS.textMed, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  label: { fontSize: 12, fontWeight: '700', color: COLORS.textMed, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8 },
+  hint:  { fontSize: 11, color: COLORS.subtext, marginBottom: 6 },
 
-  inputRow: {
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
     borderWidth: 2,
     borderColor: COLORS.border,
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+    shadowColor: COLORS.shadow,
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  bigInput: {
+  bigInput: { flex: 1, fontSize: 36, fontWeight: '800', color: COLORS.text, paddingVertical: 14 },
+  livePill:     { borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 5 },
+  livePillText: { fontSize: 12, fontWeight: '700' },
+
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.xl },
+  quickPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  quickPillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  quickPillText:       { color: COLORS.textMed, fontWeight: '600', fontSize: 13 },
+  quickPillTextActive: { color: COLORS.white },
+
+  dtRow: { flexDirection: 'row', gap: 8, marginBottom: SPACING.lg },
+  dtBtn: {
     flex: 1,
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.text,
-    paddingVertical: 14,
-  },
-  liveTag: {
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  liveTagText: { fontSize: 12, fontWeight: '700' },
-
-  quickLabel: { fontSize: 12, color: COLORS.subtext, marginBottom: 8 },
-  quickRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  quickBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.card,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  quickBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  quickBtnText:     { color: COLORS.textMed, fontWeight: '500' },
-  quickBtnTextActive: { color: COLORS.white },
-
-  timeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 20,
-  },
-  timeText: { color: COLORS.text, fontSize: 14 },
-  editLink: { color: COLORS.primary, fontSize: 13, fontWeight: '600' },
+  dtBtnLabel: { fontSize: 10, color: COLORS.subtext, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  dtBtnValue: { fontSize: 15, fontWeight: '700', color: COLORS.text },
 
   noteInput: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     fontSize: 14,
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
-    minHeight: 80,
+    minHeight: 72,
     textAlignVertical: 'top',
-    marginBottom: 20,
+    marginBottom: SPACING.lg,
   },
 
-  error: { color: COLORS.high, fontSize: 13, marginBottom: 12 },
+  error: { color: COLORS.high, fontSize: 13, fontWeight: '600', marginBottom: SPACING.md },
 
   saveBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: 14,
+    borderRadius: RADIUS.lg,
     padding: 16,
     alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  saveBtnSuccess: { backgroundColor: COLORS.safe },
+  saveBtnDone: { backgroundColor: COLORS.safe },
   saveBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
 });
