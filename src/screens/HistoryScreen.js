@@ -1,43 +1,222 @@
+// PHASE 2: Full history screen — tabbed view of glucose, insulin, food entries
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
-import { fetchGlucose } from '../database/db';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS } from '../constants/themes';
+import { format } from 'date-fns';
+
+import {
+  fetchGlucose,
+  fetchInsulin,
+  fetchFood,
+  deleteGlucose,
+  deleteInsulin,
+  deleteFood,
+} from '../database/db';
+import { COLORS, getGlucoseStatus } from '../constants/themes';
+
+const TABS = ['Glucose', 'Insulin', 'Food'];
 
 export default function HistoryScreen() {
-  const [data, setData] = useState([]);
+  const [activeTab, setActiveTab] = useState('Glucose');
+  const [glucose, setGlucose]     = useState([]);
+  const [insulin, setInsulin]     = useState([]);
+  const [food, setFood]           = useState([]);
 
-  const loadData = async () => {
-    const res = await fetchGlucose();
-    setData(res);
+  const loadAll = async () => {
+    const [g, i, f] = await Promise.all([fetchGlucose(), fetchInsulin(), fetchFood()]);
+    setGlucose(g);
+    setInsulin(i);
+    setFood(f);
   };
 
-  useFocusEffect(useCallback(() => { loadData(); }, []));
+  useFocusEffect(useCallback(() => { loadAll(); }, []));
+
+  const confirmDelete = (type, id) => {
+    Alert.alert(
+      'Delete Entry',
+      'Are you sure you want to delete this entry? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (type === 'glucose') { await deleteGlucose(id); }
+            if (type === 'insulin') { await deleteInsulin(id); }
+            if (type === 'food')    { await deleteFood(id); }
+            await loadAll();
+          },
+        },
+      ]
+    );
+  };
+
+  const renderGlucose = ({ item }) => {
+    const status = getGlucoseStatus(item.value);
+    return (
+      <View style={styles.card}>
+        <View style={[styles.accentBar, { backgroundColor: status.color }]} />
+        <View style={styles.cardBody}>
+          <View style={styles.cardMain}>
+            <Text style={[styles.cardPrimary, { color: status.color }]}>{item.value} mg/dL</Text>
+            <View style={[styles.badge, { backgroundColor: status.bg }]}>
+              <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
+            </View>
+          </View>
+          <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
+          {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
+          }
+        </View>
+        <TouchableOpacity onPress={() => confirmDelete('glucose', item.id)} style={styles.deleteBtn}>
+          <Text style={styles.deleteText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderInsulin = ({ item }) => (
+    <View style={styles.card}>
+      <View style={[styles.accentBar, { backgroundColor: COLORS.accent }]} />
+      <View style={styles.cardBody}>
+        <View style={styles.cardMain}>
+          <Text style={styles.cardPrimary}>{item.units} units</Text>
+          <View style={[styles.badge, { backgroundColor: COLORS.accentLight }]}>
+            <Text style={[styles.badgeText, { color: COLORS.accent }]}>{item.type}-Acting</Text>
+          </View>
+        </View>
+        <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
+        {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
+        }
+      </View>
+      <TouchableOpacity onPress={() => confirmDelete('insulin', item.id)} style={styles.deleteBtn}>
+        <Text style={styles.deleteText}>✕</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderFood = ({ item }) => (
+    <View style={styles.card}>
+      <View style={[styles.accentBar, { backgroundColor: COLORS.food }]} />
+      <View style={styles.cardBody}>
+        <View style={styles.cardMain}>
+          <Text style={[styles.cardPrimary, { color: COLORS.text, fontSize: 16 }]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          {item.carbs > 0 && (
+            <View style={[styles.badge, { backgroundColor: COLORS.foodLight }]}>
+              <Text style={[styles.badgeText, { color: COLORS.food }]}>{item.carbs}g carbs</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
+        {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
+        }
+      </View>
+      <TouchableOpacity onPress={() => confirmDelete('food', item.id)} style={styles.deleteBtn}>
+        <Text style={styles.deleteText}>✕</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const dataMap = { Glucose: glucose, Insulin: insulin, Food: food };
+  const renderMap = { Glucose: renderGlucose, Insulin: renderInsulin, Food: renderFood };
+  const emptyMap = {
+    Glucose: 'No glucose readings yet. Start logging!',
+    Insulin: 'No insulin doses logged yet.',
+    Food:    'No food entries yet. Start tracking meals!',
+  };
 
   return (
-    <FlatList
-      data={data}
-      keyExtractor={(item) => item.id.toString()}
-      contentContainerStyle={{ padding: 20, backgroundColor: COLORS.background }}
-      renderItem={({ item }) => (
-        <View style={styles.card}>
-          <Text style={styles.value}>{item.value} mg/dL</Text>
-          <Text style={styles.time}>
-            {new Date(item.timestamp).toLocaleString()}
-          </Text>
-        </View>
-      )}
-    />
+    <View style={styles.container}>
+
+      {/* ─── Tab Bar ─── */}
+      <View style={styles.tabBar}>
+        {TABS.map(tab => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.tabActive]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+            <View style={[styles.tabCount, activeTab === tab && styles.tabCountActive]}>
+              <Text style={[styles.tabCountText, activeTab === tab && styles.tabCountTextActive]}>
+                {dataMap[tab].length}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ─── List ─── */}
+      <FlatList
+        data={dataMap[activeTab]}
+        keyExtractor={item => `${activeTab}-${item.id}`}
+        renderItem={renderMap[activeTab]}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>{emptyMap[activeTab]}</Text>
+          </View>
+        }
+      />
+
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.background },
+
+  tabBar: { flexDirection: 'row', backgroundColor: COLORS.card, paddingHorizontal: 16, paddingTop: 12 },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    gap: 6,
+  },
+  tabActive: { borderBottomColor: COLORS.primary },
+  tabText:       { fontSize: 14, fontWeight: '500', color: COLORS.subtext },
+  tabTextActive: { color: COLORS.primary, fontWeight: '700' },
+  tabCount:      { backgroundColor: COLORS.background, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
+  tabCountActive:{ backgroundColor: COLORS.primaryLight },
+  tabCountText:      { fontSize: 11, color: COLORS.subtext, fontWeight: '600' },
+  tabCountTextActive:{ color: COLORS.primary },
+
+  listContent: { padding: 16, paddingBottom: 30 },
+
   card: {
+    flexDirection: 'row',
     backgroundColor: COLORS.card,
-    padding: 15,
     borderRadius: 12,
     marginBottom: 10,
+    overflow: 'hidden',
+    shadowColor: COLORS.shadow,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  value: { fontSize: 18, fontWeight: 'bold' },
-  time: { color: COLORS.subtext, marginTop: 5 },
+  accentBar: { width: 4 },
+  cardBody:  { flex: 1, padding: 14 },
+  cardMain:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  cardPrimary: { fontSize: 17, fontWeight: '700', color: COLORS.text },
+  badge:     { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  badgeText: { fontSize: 11, fontWeight: '600' },
+  cardTime:  { fontSize: 12, color: COLORS.subtext },
+  cardNote:  { fontSize: 12, color: COLORS.placeholder, marginTop: 4, fontStyle: 'italic' },
+  deleteBtn: { padding: 14, justifyContent: 'center', alignItems: 'center' },
+  deleteText:{ fontSize: 14, color: COLORS.placeholder },
+
+  empty: { paddingTop: 60, alignItems: 'center' },
+  emptyText: { color: COLORS.placeholder, fontSize: 14 },
 });

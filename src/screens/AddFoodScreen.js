@@ -1,4 +1,4 @@
-// PHASE 2 + PHASE 5: Log an insulin dose with type selector and validation
+// PHASE 2 + PHASE 5: Log a food entry with carb tracking
 import React, { useState } from 'react';
 import {
   View,
@@ -13,33 +13,34 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 
-import { insertInsulin } from '../database/db';
+import { insertFood } from '../database/db';
 import { COLORS } from '../constants/themes';
 
-const INSULIN_TYPES = [
-  { key: 'Rapid', label: 'Rapid-Acting', desc: 'Humalog, NovoLog, Fiasp' },
-  { key: 'Long',  label: 'Long-Acting',  desc: 'Lantus, Basaglar, Toujeo' },
+// Common foods with typical carb values for quick-add
+const QUICK_FOODS = [
+  { name: 'White rice (1 cup)',  carbs: 45 },
+  { name: 'White bread (1 sl)', carbs: 15 },
+  { name: 'Apple (medium)',     carbs: 25 },
+  { name: 'Banana (medium)',    carbs: 27 },
+  { name: 'Orange juice (8oz)', carbs: 26 },
+  { name: 'Pasta (1 cup)',      carbs: 40 },
 ];
 
-const QUICK_UNITS = [1, 2, 4, 6, 8, 10, 12, 15];
-
-export default function AddInsulinScreen() {
-  const [units, setUnits]   = useState('');
-  const [type, setType]     = useState('Rapid');
-  const [note, setNote]     = useState('');
-  const [date, setDate]     = useState(new Date());
+export default function AddFoodScreen() {
+  const [name, setName]         = useState('');
+  const [carbs, setCarbs]       = useState('');
+  const [note, setNote]         = useState('');
+  const [date, setDate]         = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
-  const [error, setError]   = useState('');
-
-  const numericUnits = parseFloat(units);
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
+  const [error, setError]       = useState('');
 
   const validate = () => {
-    if (!units.trim())          return 'Please enter the number of units.';
-    if (isNaN(numericUnits))    return 'Units must be a number.';
-    if (numericUnits <= 0)      return 'Units must be greater than 0.';
-    if (numericUnits > 100)     return 'Units seem very high (max 100). Double-check.';
+    if (!name.trim())             return 'Please enter a food name.';
+    const c = parseFloat(carbs);
+    if (carbs !== '' && (isNaN(c) || c < 0)) return 'Carbs must be a positive number.';
+    if (!isNaN(c) && c > 500)    return 'Carbs value seems too high (max 500g).';
     return null;
   };
 
@@ -49,69 +50,75 @@ export default function AddInsulinScreen() {
     setError('');
     setSaving(true);
     try {
-      await insertInsulin(numericUnits, type, date.toISOString(), note.trim());
+      const carbsValue = carbs !== '' ? parseFloat(carbs) : 0;
+      await insertFood(name.trim(), carbsValue, date.toISOString(), note.trim());
       setSaved(true);
-      setUnits('');
+      setName('');
+      setCarbs('');
       setNote('');
       setDate(new Date());
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      Alert.alert('Error', 'Could not save dose. Please try again.');
+      Alert.alert('Error', 'Could not save food entry. Please try again.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const applyQuickFood = (item) => {
+    setName(item.name);
+    setCarbs(String(item.carbs));
+    setError('');
   };
 
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.inner}>
 
-        <Text style={styles.heading}>Log Insulin</Text>
-        <Text style={styles.subheading}>Track your insulin dose</Text>
+        <Text style={styles.heading}>Log Food</Text>
+        <Text style={styles.subheading}>Track your meals and carbohydrates</Text>
 
-        {/* ─── Insulin Type ─── */}
-        <Text style={styles.label}>Insulin Type</Text>
-        <View style={styles.typeRow}>
-          {INSULIN_TYPES.map(t => {
-            const active = type === t.key;
-            return (
-              <TouchableOpacity
-                key={t.key}
-                style={[styles.typeCard, active && styles.typeCardActive]}
-                onPress={() => setType(t.key)}
-              >
-                <Text style={[styles.typeTitle, active && styles.typeTitleActive]}>{t.label}</Text>
-                <Text style={[styles.typeDesc,  active && styles.typeDescActive]}>{t.desc}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {/* ─── Food Name ─── */}
+        <Text style={styles.label}>Food / Meal Name</Text>
+        <TextInput
+          value={name}
+          onChangeText={v => { setName(v); setError(''); }}
+          placeholder="e.g. Oatmeal with berries"
+          placeholderTextColor={COLORS.placeholder}
+          style={styles.input}
+          maxLength={100}
+        />
 
-        {/* ─── Units Input ─── */}
-        <Text style={styles.label}>Units</Text>
+        {/* ─── Carbs ─── */}
+        <Text style={styles.label}>Carbohydrates (g) — optional</Text>
         <View style={styles.inputRow}>
           <TextInput
-            value={units}
-            onChangeText={v => { setUnits(v); setError(''); }}
+            value={carbs}
+            onChangeText={v => { setCarbs(v); setError(''); }}
             keyboardType="decimal-pad"
             placeholder="0"
             placeholderTextColor={COLORS.placeholder}
-            style={styles.bigInput}
+            style={styles.carbInput}
             maxLength={5}
           />
-          <Text style={styles.unitSuffix}>units</Text>
+          <Text style={styles.carbSuffix}>g carbs</Text>
         </View>
 
-        {/* ─── Quick-Select Units ─── */}
-        <Text style={styles.quickLabel}>Quick Select</Text>
-        <View style={styles.quickRow}>
-          {QUICK_UNITS.map(u => (
+        {/* ─── Quick Foods ─── */}
+        <Text style={styles.quickLabel}>Common Foods</Text>
+        <View style={styles.quickGrid}>
+          {QUICK_FOODS.map(item => (
             <TouchableOpacity
-              key={u}
-              style={[styles.quickBtn, units === String(u) && styles.quickBtnActive]}
-              onPress={() => { setUnits(String(u)); setError(''); }}
+              key={item.name}
+              style={[styles.quickCard, name === item.name && styles.quickCardActive]}
+              onPress={() => applyQuickFood(item)}
             >
-              <Text style={[styles.quickBtnText, units === String(u) && styles.quickBtnTextActive]}>{u}</Text>
+              <Text style={[styles.quickCardName, name === item.name && styles.quickCardNameActive]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={[styles.quickCardCarbs, name === item.name && styles.quickCardCarbsActive]}>
+                {item.carbs}g
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -136,7 +143,7 @@ export default function AddInsulinScreen() {
         <TextInput
           value={note}
           onChangeText={setNote}
-          placeholder="e.g. correction dose, pre-meal..."
+          placeholder="e.g. estimated portion, restaurant meal..."
           placeholderTextColor={COLORS.placeholder}
           style={styles.noteInput}
           multiline
@@ -153,7 +160,7 @@ export default function AddInsulinScreen() {
         >
           {saving
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.saveBtnText}>{saved ? 'Saved!' : 'Save Dose'}</Text>
+            : <Text style={styles.saveBtnText}>{saved ? 'Saved!' : 'Save Meal'}</Text>
           }
         </TouchableOpacity>
 
@@ -171,53 +178,54 @@ const styles = StyleSheet.create({
 
   label: { fontSize: 13, fontWeight: '600', color: COLORS.textMed, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  typeRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  typeCard: {
-    flex: 1,
+  input: {
     backgroundColor: COLORS.card,
     borderRadius: 12,
     padding: 14,
-    borderWidth: 2,
+    fontSize: 15,
+    color: COLORS.text,
+    borderWidth: 1,
     borderColor: COLORS.border,
+    marginBottom: 20,
   },
-  typeCardActive: { borderColor: COLORS.accent, backgroundColor: COLORS.accentLight },
-  typeTitle:       { fontSize: 13, fontWeight: '700', color: COLORS.textMed },
-  typeTitleActive: { color: COLORS.accent },
-  typeDesc:        { fontSize: 11, color: COLORS.placeholder, marginTop: 3 },
-  typeDescActive:  { color: COLORS.accent },
 
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.card,
     borderRadius: 14,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: 16,
     marginBottom: 16,
   },
-  bigInput: {
+  carbInput: {
     flex: 1,
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
     color: COLORS.text,
     paddingVertical: 14,
   },
-  unitSuffix: { fontSize: 16, color: COLORS.subtext, fontWeight: '500' },
+  carbSuffix: { fontSize: 15, color: COLORS.subtext, fontWeight: '500' },
 
   quickLabel: { fontSize: 12, color: COLORS.subtext, marginBottom: 8 },
-  quickRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  quickBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  quickGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  quickCard: {
+    width: '47%',
     backgroundColor: COLORS.card,
+    borderRadius: 10,
+    padding: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  quickBtnActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
-  quickBtnText:   { color: COLORS.textMed, fontWeight: '500' },
-  quickBtnTextActive: { color: COLORS.white },
+  quickCardActive: { backgroundColor: COLORS.foodLight, borderColor: COLORS.food },
+  quickCardName:       { flex: 1, fontSize: 12, color: COLORS.textMed, marginRight: 4 },
+  quickCardNameActive: { color: COLORS.food, fontWeight: '600' },
+  quickCardCarbs:       { fontSize: 12, fontWeight: '700', color: COLORS.subtext },
+  quickCardCarbsActive: { color: COLORS.food },
 
   timeRow: {
     flexDirection: 'row',
@@ -249,7 +257,7 @@ const styles = StyleSheet.create({
   error: { color: COLORS.high, fontSize: 13, marginBottom: 12 },
 
   saveBtn: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.food,
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
