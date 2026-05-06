@@ -26,7 +26,7 @@ const QUICK_FOODS = [
   { name: 'Pasta (1 cup)',      carbs: 40 },
 ];
 
-export default function AddFoodScreen() {
+export default function AddFoodScreen({ navigation }) {
   const [name, setName]         = useState('');
   const [carbs, setCarbs]       = useState('');
   const [note, setNote]         = useState('');
@@ -57,7 +57,10 @@ export default function AddFoodScreen() {
       setCarbs('');
       setNote('');
       setDate(new Date());
-      setTimeout(() => setSaved(false), 2000);
+      setTimeout(() => {
+        setSaved(false);
+        navigation?.navigate?.('Dashboard');
+      }, 800);
     } catch (e) {
       Alert.alert('Error', 'Could not save food entry. Please try again.');
     } finally {
@@ -151,7 +154,6 @@ export default function AddFoodScreen() {
         />
 
         {!!error && <Text style={styles.error}>{error}</Text>}
-        }
 
         <TouchableOpacity
           style={[styles.saveBtn, saved && styles.saveBtnSuccess]}

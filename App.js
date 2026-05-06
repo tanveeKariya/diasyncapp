@@ -33,8 +33,14 @@ export default function App() {
   useEffect(() => {
     (async () => {
       await initDB();
-      if (Platform.OS !== 'web') {
-        await scheduleReminders();
+      // Notifications only work in development builds, not Expo Go
+      // They will silently no-op if unavailable
+      try {
+        if (Platform.OS !== 'web') {
+          await scheduleReminders();
+        }
+      } catch {
+        // Silently skip notifications in Expo Go
       }
     })();
   }, []);

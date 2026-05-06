@@ -23,7 +23,7 @@ const INSULIN_TYPES = [
 
 const QUICK_UNITS = [1, 2, 4, 6, 8, 10, 12, 15];
 
-export default function AddInsulinScreen() {
+export default function AddInsulinScreen({ navigation }) {
   const [units, setUnits]   = useState('');
   const [type, setType]     = useState('Rapid');
   const [note, setNote]     = useState('');
@@ -54,7 +54,10 @@ export default function AddInsulinScreen() {
       setUnits('');
       setNote('');
       setDate(new Date());
-      setTimeout(() => setSaved(false), 2000);
+      setTimeout(() => {
+        setSaved(false);
+        navigation?.navigate?.('Dashboard');
+      }, 800);
     } catch (e) {
       Alert.alert('Error', 'Could not save dose. Please try again.');
     } finally {
@@ -144,7 +147,6 @@ export default function AddInsulinScreen() {
         />
 
         {!!error && <Text style={styles.error}>{error}</Text>}
-        }
 
         <TouchableOpacity
           style={[styles.saveBtn, saved && styles.saveBtnSuccess]}

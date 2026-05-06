@@ -1,4 +1,4 @@
-// PHASE 2: Full history screen — tabbed view of glucose, insulin, food entries
+// History screen — tabbed view of glucose, insulin, food entries with day/week/month filters
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -9,34 +9,67 @@ import {
   Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 import {
   fetchGlucose,
   fetchInsulin,
   fetchFood,
+  fetchGlucoseByRange,
+  fetchInsulinByRange,
+  fetchFoodByRange,
   deleteGlucose,
   deleteInsulin,
   deleteFood,
 } from '../database/db';
 import { COLORS, getGlucoseStatus } from '../constants/themes';
 
-const TABS = ['Glucose', 'Insulin', 'Food'];
+const DATA_TABS  = ['Glucose', 'Insulin', 'Food'];
+const TIME_TABS  = ['Day', 'Week', 'Month', 'All'];
 
 export default function HistoryScreen() {
-  const [activeTab, setActiveTab] = useState('Glucose');
-  const [glucose, setGlucose]     = useState([]);
-  const [insulin, setInsulin]     = useState([]);
-  const [food, setFood]           = useState([]);
+  const [activeTab, setActiveTab]   = useState('Glucose');
+  const [timeRange, setTimeRange]   = useState('All');
+  const [glucose, setGlucose]       = useState([]);
+  const [insulin, setInsulin]       = useState([]);
+  const [food, setFood]             = useState([]);
 
-  const loadAll = async () => {
-    const [g, i, f] = await Promise.all([fetchGlucose(), fetchInsulin(), fetchFood()]);
+  const getTimeRange = () => {
+    const now = new Date();
+    switch (timeRange) {
+      case 'Day':
+        return { start: startOfDay(now).toISOString(), end: endOfDay(now).toISOString() };
+      case 'Week':
+        return { start: startOfWeek(now, { weekStartsOn: 1 }).toISOString(), end: endOfWeek(now, { weekStartsOn: 1 }).toISOString() };
+      case 'Month':
+        return { start: startOfMonth(now).toISOString(), end: endOfMonth(now).toISOString() };
+      default:
+        return null; // All time
+    }
+  };
+
+  const loadAll = useCallback(async () => {
+    const range = getTimeRange();
+    let g, i, f;
+    if (range) {
+      [g, i, f] = await Promise.all([
+        fetchGlucoseByRange(range.start, range.end),
+        fetchInsulinByRange(range.start, range.end),
+        fetchFoodByRange(range.start, range.end),
+      ]);
+      // Reverse for most-recent-first display
+      g = [...g].reverse();
+      i = [...i].reverse();
+      f = [...f].reverse();
+    } else {
+      [g, i, f] = await Promise.all([fetchGlucose(), fetchInsulin(), fetchFood()]);
+    }
     setGlucose(g);
     setInsulin(i);
     setFood(f);
-  };
+  }, [timeRange]);
 
-  useFocusEffect(useCallback(() => { loadAll(); }, []));
+  useFocusEffect(useCallback(() => { loadAll(); }, [loadAll]));
 
   const confirmDelete = (type, id) => {
     Alert.alert(
@@ -72,10 +105,9 @@ export default function HistoryScreen() {
           </View>
           <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
           {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
-          }
         </View>
         <TouchableOpacity onPress={() => confirmDelete('glucose', item.id)} style={styles.deleteBtn}>
-          <Text style={styles.deleteText}>✕</Text>
+          <Text style={styles.deleteText}>X</Text>
         </TouchableOpacity>
       </View>
     );
@@ -93,10 +125,9 @@ export default function HistoryScreen() {
         </View>
         <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
         {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
-        }
       </View>
       <TouchableOpacity onPress={() => confirmDelete('insulin', item.id)} style={styles.deleteBtn}>
-        <Text style={styles.deleteText}>✕</Text>
+        <Text style={styles.deleteText}>X</Text>
       </TouchableOpacity>
     </View>
   );
@@ -117,28 +148,27 @@ export default function HistoryScreen() {
         </View>
         <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
         {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
-        }
       </View>
       <TouchableOpacity onPress={() => confirmDelete('food', item.id)} style={styles.deleteBtn}>
-        <Text style={styles.deleteText}>✕</Text>
+        <Text style={styles.deleteText}>X</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const dataMap = { Glucose: glucose, Insulin: insulin, Food: food };
+  const dataMap   = { Glucose: glucose, Insulin: insulin, Food: food };
   const renderMap = { Glucose: renderGlucose, Insulin: renderInsulin, Food: renderFood };
-  const emptyMap = {
-    Glucose: 'No glucose readings yet. Start logging!',
-    Insulin: 'No insulin doses logged yet.',
-    Food:    'No food entries yet. Start tracking meals!',
+  const emptyMap  = {
+    Glucose: 'No glucose readings for this period.',
+    Insulin: 'No insulin doses for this period.',
+    Food:    'No food entries for this period.',
   };
 
   return (
     <View style={styles.container}>
 
-      {/* ─── Tab Bar ─── */}
+      {/* ─── Data Type Tabs ─── */}
       <View style={styles.tabBar}>
-        {TABS.map(tab => (
+        {DATA_TABS.map(tab => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -150,6 +180,19 @@ export default function HistoryScreen() {
                 {dataMap[tab].length}
               </Text>
             </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ─── Time Range Filter ─── */}
+      <View style={styles.timeBar}>
+        {TIME_TABS.map(t => (
+          <TouchableOpacity
+            key={t}
+            style={[styles.timeBtn, timeRange === t && styles.timeBtnActive]}
+            onPress={() => setTimeRange(t)}
+          >
+            <Text style={[styles.timeBtnText, timeRange === t && styles.timeBtnTextActive]}>{t}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -193,6 +236,12 @@ const styles = StyleSheet.create({
   tabCountText:      { fontSize: 11, color: COLORS.subtext, fontWeight: '600' },
   tabCountTextActive:{ color: COLORS.primary },
 
+  timeBar: { flexDirection: 'row', backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.divider },
+  timeBtn: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 8, marginRight: 4 },
+  timeBtnActive: { backgroundColor: COLORS.secondary },
+  timeBtnText:       { fontSize: 12, color: COLORS.subtext, fontWeight: '500' },
+  timeBtnTextActive: { color: COLORS.white, fontWeight: '700' },
+
   listContent: { padding: 16, paddingBottom: 30 },
 
   card: {
@@ -215,7 +264,7 @@ const styles = StyleSheet.create({
   cardTime:  { fontSize: 12, color: COLORS.subtext },
   cardNote:  { fontSize: 12, color: COLORS.placeholder, marginTop: 4, fontStyle: 'italic' },
   deleteBtn: { padding: 14, justifyContent: 'center', alignItems: 'center' },
-  deleteText:{ fontSize: 14, color: COLORS.placeholder },
+  deleteText:{ fontSize: 14, color: COLORS.placeholder, fontWeight: '700' },
 
   empty: { paddingTop: 60, alignItems: 'center' },
   emptyText: { color: COLORS.placeholder, fontSize: 14 },

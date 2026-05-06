@@ -1,4 +1,4 @@
-// PHASE 7 BONUS: Settings — export data, notification preferences, app info
+// Settings — export data, notification preferences, app info
 import React, { useState } from 'react';
 import {
   View,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { COLORS } from '../constants/themes';
 import { exportAllData } from '../utils/exportCSV';
-import { scheduleReminders, cancelAllReminders } from '../utils/notifications';
+import { scheduleReminders, cancelAllReminders, isNotificationsAvailable } from '../utils/notifications';
 
 export default function SettingsScreen() {
   const [exporting, setExporting]         = useState(false);
@@ -22,9 +22,9 @@ export default function SettingsScreen() {
     setExporting(true);
     try {
       await exportAllData();
-      Alert.alert('Export Complete', 'Your data has been exported and the share dialog has opened.');
+      Alert.alert('Export Complete', 'Your data has been exported successfully.');
     } catch (e) {
-      Alert.alert('Export Failed', 'Could not export data. Please try again.\n' + e.message);
+      Alert.alert('Export Failed', 'Could not export data. Please try again.\n' + (e.message || ''));
     } finally {
       setExporting(false);
     }
@@ -35,10 +35,17 @@ export default function SettingsScreen() {
       Alert.alert('Not Supported', 'Notifications are not available in web preview. They will work on your Android/iOS device.');
       return;
     }
+    if (!isNotificationsAvailable()) {
+      Alert.alert(
+        'Not Available in Expo Go',
+        'Notifications require a development build. To use them, build the app with EAS Build and install the APK on your device.'
+      );
+      return;
+    }
     try {
       await scheduleReminders();
       setNotifStatus('enabled');
-      Alert.alert('Reminders Enabled', 'You will receive glucose check reminders at 8am, 2pm, 8pm, and an insulin reminder at 10pm.');
+      Alert.alert('Hourly Reminders Enabled', 'You will receive a reminder every hour to check your blood glucose.');
     } catch (e) {
       Alert.alert('Error', 'Could not enable reminders: ' + e.message);
     }
@@ -77,8 +84,8 @@ export default function SettingsScreen() {
         <SectionHeader title="Notifications" />
 
         <SettingCard
-          title="Enable Daily Reminders"
-          desc="Get reminders to check your glucose at 8am, 2pm, and 8pm, plus a long-acting insulin reminder at 10pm."
+          title="Enable Hourly Reminders"
+          desc="Get a reminder every hour to check your blood glucose. Requires a development build (not Expo Go)."
           onPress={handleEnableReminders}
           color={COLORS.secondary}
           btnLabel="Enable"
@@ -102,7 +109,7 @@ export default function SettingsScreen() {
         <View style={styles.infoCard}>
           <RangeRow label="Low alert below"     value="70 mg/dL"  color={COLORS.low}  />
           <RangeRow label="High alert above"    value="180 mg/dL" color={COLORS.high} />
-          <RangeRow label="Target range"        value="70 – 180 mg/dL" color={COLORS.safe} />
+          <RangeRow label="Target range"        value="70 - 180 mg/dL" color={COLORS.safe} />
           <Text style={styles.rangeNote}>These are the standard T1D targets. Consult your endocrinologist for personalised ranges.</Text>
         </View>
 

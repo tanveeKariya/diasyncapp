@@ -52,7 +52,11 @@ export default function AddGlucoseScreen({ navigation }) {
       setValue('');
       setNote('');
       setDate(new Date());
-      setTimeout(() => setSaved(false), 2000);
+      // Navigate to Dashboard after a brief delay so the user sees "Saved!"
+      setTimeout(() => {
+        setSaved(false);
+        navigation?.navigate?.('Dashboard');
+      }, 800);
     } catch (e) {
       Alert.alert('Error', 'Could not save reading. Please try again.');
     } finally {
@@ -137,7 +141,6 @@ export default function AddGlucoseScreen({ navigation }) {
 
         {/* ─── Error ─── */}
         {!!error && <Text style={styles.error}>{error}</Text>}
-        }
 
         {/* ─── Save Button ─── */}
         <TouchableOpacity
