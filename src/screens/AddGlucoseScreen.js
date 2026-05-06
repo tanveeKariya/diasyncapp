@@ -141,6 +141,7 @@ export default function AddGlucoseScreen({ navigation }) {
 
         {/* ─── Error ─── */}
         {!!error && <Text style={styles.error}>{error}</Text>}
+        }
 
         {/* ─── Save Button ─── */}
         <TouchableOpacity

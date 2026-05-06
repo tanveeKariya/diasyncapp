@@ -105,6 +105,7 @@ export default function HistoryScreen() {
           </View>
           <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
           {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
+          }
         </View>
         <TouchableOpacity onPress={() => confirmDelete('glucose', item.id)} style={styles.deleteBtn}>
           <Text style={styles.deleteText}>X</Text>
@@ -125,6 +126,7 @@ export default function HistoryScreen() {
         </View>
         <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
         {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
+        }
       </View>
       <TouchableOpacity onPress={() => confirmDelete('insulin', item.id)} style={styles.deleteBtn}>
         <Text style={styles.deleteText}>X</Text>
@@ -148,6 +150,7 @@ export default function HistoryScreen() {
         </View>
         <Text style={styles.cardTime}>{format(new Date(item.timestamp), 'EEE d MMM · HH:mm')}</Text>
         {!!item.note && <Text style={styles.cardNote}>{item.note}</Text>}
+        }
       </View>
       <TouchableOpacity onPress={() => confirmDelete('food', item.id)} style={styles.deleteBtn}>
         <Text style={styles.deleteText}>X</Text>

@@ -147,6 +147,7 @@ export default function AddInsulinScreen({ navigation }) {
         />
 
         {!!error && <Text style={styles.error}>{error}</Text>}
+        }
 
         <TouchableOpacity
           style={[styles.saveBtn, saved && styles.saveBtnSuccess]}
