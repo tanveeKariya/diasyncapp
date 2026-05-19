@@ -1,10 +1,8 @@
-// Hourly reminder notifications — gracefully handles Expo Go limitations
 import { Platform } from 'react-native';
 
 let notificationsAvailable = false;
 let Notifications = null;
 
-// Try to import expo-notifications — it may not be available in Expo Go
 try {
   Notifications = require('expo-notifications');
   Notifications.setNotificationHandler({
@@ -38,22 +36,21 @@ export const cancelAllReminders = async () => {
   } catch {}
 };
 
-// Schedule a repeating hourly notification
-export const scheduleHourlyReminders = async (title, body) => {
+const scheduleRepeatingNotification = async (title, body, intervalSeconds) => {
   if (!notificationsAvailable) return;
   try {
     await Notifications.scheduleNotificationAsync({
       content: { title, body, sound: true },
       trigger: {
-        seconds: 3600,
+        seconds: intervalSeconds,
         repeats: true,
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       },
     });
-  } catch {}
+  } catch (e) {
+    console.warn('Notification schedule error:', e?.message || e);
+  }
 };
 
-// Main setup — hourly reminders to log glucose, insulin, food
 export const scheduleReminders = async () => {
   if (Platform.OS === 'web') return;
 
@@ -62,8 +59,10 @@ export const scheduleReminders = async () => {
 
   await cancelAllReminders();
 
-  await scheduleHourlyReminders(
+  // Every 2 hours (7200 seconds) — reminder to log glucose and insulin
+  await scheduleRepeatingNotification(
     'Time to log your readings',
-    'Record your glucose, insulin, and food to stay on track.'
+    'Record your glucose and insulin to stay on track.',
+    7200
   );
 };

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
-import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth } from 'date-fns';
 
 import {
   fetchGlucose,
@@ -53,8 +53,13 @@ export default function HomeScreen() {
     setLatest(all[0] ?? null);
 
     const rows = await fetchGlucoseByRange(start, end);
-    const step = Math.max(1, Math.floor(rows.length / 12));
-    const sampled = rows.filter((_, i) => i % step === 0).slice(-12);
+    let sampled;
+    if (rows.length <= 12) {
+      sampled = rows;
+    } else {
+      const step = Math.max(1, Math.floor(rows.length / 12));
+      sampled = rows.filter((_, i) => i % step === 0).slice(-12);
+    }
     const labelFmt = range === 'Today' ? 'HH:mm' : range === '7 Days' ? 'EEE' : 'd MMM';
     setLabels(sampled.map(r => format(new Date(r.timestamp), labelFmt)));
     setValues(sampled.map(r => r.value));
@@ -160,10 +165,13 @@ export default function HomeScreen() {
       {/* ─── Glucose Trend Chart ─── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Glucose Trend</Text>
-        {chartValues.length >= 2 ? (
+        {chartValues.length >= 1 ? (
           <View style={styles.chartCard}>
             <LineChart
-              data={{ labels: chartLabels, datasets: [{ data: chartValues }] }}
+              data={{
+                labels: chartValues.length === 1 ? ['', ...chartLabels] : chartLabels,
+                datasets: [{ data: chartValues.length === 1 ? [0, ...chartValues] : chartValues }],
+              }}
               width={CHART_W}
               height={200}
               chartConfig={chartConfig}
@@ -175,7 +183,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.emptyChart}>
-            <Text style={styles.emptyChartText}>Add at least 2 readings to see your trend</Text>
+            <Text style={styles.emptyChartText}>Add a reading to see your trend</Text>
           </View>
         )}
       </View>

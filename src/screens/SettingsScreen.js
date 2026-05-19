@@ -47,7 +47,7 @@ export default function SettingsScreen() {
     try {
       await scheduleReminders();
       setNotifStatus('enabled');
-      Alert.alert('Hourly Reminders Enabled', 'You will receive a reminder every hour to log your glucose.');
+      Alert.alert('Reminders Enabled', 'You will receive a reminder every 2 hours to log your glucose and insulin.');
     } catch (e) {
       Alert.alert('Error', e.message || 'Could not enable reminders.');
     }
@@ -84,8 +84,8 @@ export default function SettingsScreen() {
         {/* ─── Notifications ─── */}
         <SectionTitle title="Notifications" />
         <ActionCard
-          title="Enable Hourly Reminders"
-          desc="Get a reminder every hour to log your glucose, insulin, and food."
+          title="Enable 2-Hour Reminders"
+          desc="Get a reminder every 2 hours to log your glucose and insulin."
           onPress={handleEnableReminders}
           color={COLORS.secondary}
           label="Enable"

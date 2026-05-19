@@ -1,10 +1,17 @@
-// Export all data as CSV — uses FileSystem.writeAsStringAsync + Sharing.shareAsync
 import { Platform, Share, Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { format } from 'date-fns';
 
 import { fetchGlucose, fetchInsulin, fetchFood } from '../database/db';
+
+const escapeCSV = (val) => {
+  const str = String(val ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
 
 export const exportAllData = async () => {
   const [glucose, insulin, food] = await Promise.all([
@@ -13,50 +20,68 @@ export const exportAllData = async () => {
     fetchFood(),
   ]);
 
-  // Unified CSV format: type,value,units,timestamp
-  const lines = ['type,value,units,timestamp'];
+  const lines = ['type,value,units,carbs,note,timestamp'];
 
   for (const g of glucose) {
-    lines.push(`glucose,${g.value},,${g.timestamp}`);
+    lines.push([
+      'glucose',
+      escapeCSV(g.value),
+      '',
+      '',
+      escapeCSV(g.note),
+      escapeCSV(g.timestamp),
+    ].join(','));
   }
 
   for (const i of insulin) {
-    lines.push(`insulin,,${i.units},${i.timestamp}`);
+    lines.push([
+      'insulin',
+      '',
+      escapeCSV(i.units),
+      '',
+      escapeCSV(i.note),
+      escapeCSV(i.timestamp),
+    ].join(','));
   }
 
   for (const f of food) {
-    const carbsPart = f.carbs > 0 ? `${f.carbs}` : '';
-    lines.push(`food,${f.name},${carbsPart},${f.timestamp}`);
+    lines.push([
+      'food',
+      escapeCSV(f.name),
+      '',
+      escapeCSV(f.carbs),
+      escapeCSV(f.note),
+      escapeCSV(f.timestamp),
+    ].join(','));
   }
 
   const csvContent = lines.join('\n');
   const filename = `diabetes_export_${format(new Date(), 'yyyy-MM-dd_HHmm')}.csv`;
 
-  // Write file to device storage
+  if (Platform.OS === 'web') {
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return filename;
+  }
+
   const filePath = FileSystem.documentDirectory + filename;
 
   await FileSystem.writeAsStringAsync(filePath, csvContent, {
     encoding: FileSystem.EncodingType.UTF8,
   });
 
-  // Verify file was created
   const info = await FileSystem.getInfoAsync(filePath);
   if (!info.exists) {
     throw new Error('File was not created.');
-  }
-
-  // Share the file
-  if (Platform.OS === 'web') {
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    return filePath;
   }
 
   const canShare = await Sharing.isAvailableAsync();
